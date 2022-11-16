@@ -1,74 +1,80 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { PokemonWithStats } from "models/PokemonWithStats";
+import { get } from './httpRequest';
 
+const urlApiPokeman = `https://pokeapi.co/api/v2/pokemon`;
+
+/**
+ * 
+ * @param request 
+ * @param reply 
+ * @returns 
+ */
 export async function getPokemonByName(request: FastifyRequest, reply: FastifyReply) {
-  var name: string = request.params['name']
+  
+  let name: string = request.params['name']
 
-  reply.headers['Accept'] = 'application/json'
+  reply.headers['Accept'] = 'application/json';
 
-  var urlApiPokeman = `https://pokeapi.co/api/v2/pokemon/`;
-
-  var params = {}
-
-  name == null
+  let params = {}
+  let url = urlApiPokeman;
+  name != null
       ? name.trim() != ''
-      ? (params["name"] = name, urlApiPokeman = urlApiPokeman + '/', urlApiPokeman = urlApiPokeman + name)
-      : (urlApiPokeman = urlApiPokeman + '"?offset=20"', urlApiPokeman = urlApiPokeman + "&limit=20")
-      : (urlApiPokeman = urlApiPokeman + '"?offset=20"', urlApiPokeman = urlApiPokeman + "&limit=20")
+      ? (params["name"] = name, url = url + '/', url = url + name)
+      : (url = url + '"?offset=20"', url = url + "&limit=20")
+      : (url = url + '"?offset=20"', url = url + "&limit=20")
 
-  const http = require('http');
-  const keepAliveAgent = new http.Agent({ keepAlive: true });
-
-  let response: any = ""
-
-  http.request({ ...reply.headers, ...({ hostname: urlApiPokeman, port: 80, }) }, (result) => { response = result })
-
+  let response = await get(url);
   if (response == null) {
-    reply.code(404)
+    reply.code(404);
   }
 
-  computeResponse(response, reply)
+  const updatedResponse = await computeResponse(response);
 
-  reply.send(response)
-
-  return reply
+  reply.send(updatedResponse);
+  return reply;
 }
 
-export const computeResponse = async (response: unknown, reply: FastifyReply) => {
-  const resp = response as any
+/**
+ * 
+ * @param response 
+ * @returns PokemonWithStats
+ */
+export const computeResponse = async (response: any): Promise<PokemonWithStats> => {
 
-  let types = resp.types.map(type => type.type).map(type => { return type.url }).reduce((types, typeUrl) => types.push(typeUrl));
-
-  let pokemonTypes = []
-
-  types.forEach(element => {
-    const http = require('http');
-    const keepAliveAgent = new http.Agent({ keepAlive: true });
-
-    http.request({ hostname: element }, (response) => pokemonTypes.push(response))
-
-  });
-
+  const types = response.types.map(type => type.type.url);
+  const pokemonTypes = [];
+  
+  for await (let url of types) {
+    const result = await get(url);
+    pokemonTypes.push(result);
+  }
   if (pokemonTypes == undefined)
     throw pokemonTypes
 
-  response.stats.forEach(element => {
-    var stats = []
-
+  const stats = response.stats.map(element => {
+    const stats = [];
+    let averageStat = 0;
     pokemonTypes.map(pok =>
-        pok.stats.map(st =>
+        pok.stats?.map(st =>
             st.stat.name.toUpperCase() == element.stat.name
                 ? stats.push(st.base_state)
                 : ([])
         )
-    )
-
-    if (stats) {
-      let avg = stats.reduce((a, b) => a + b) / stats.length
-      element.averageStat = avg
+    );
+    
+    if (stats.length > 0) {
+      averageStat = stats.reduce((a, b) => a + b, 0) / stats.length;
     } else {
-      element.averageStat = 0
+      averageStat = 0;
+    }
+    return {
+      ...element,
+      averageStat
     }
   });
-
+  return {
+    ...response,
+    stats
+  }
 }
