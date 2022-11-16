@@ -1,28 +1,30 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { PokemonWithStats } from "models/PokemonWithStats";
-import { get } from './httpRequest';
+import { get } from "./httpRequest";
 
 const urlApiPokeman = `https://pokeapi.co/api/v2/pokemon`;
 
 /**
- * 
- * @param request 
- * @param reply 
- * @returns 
+ *
+ * @param request
+ * @param reply
+ * @returns
  */
-export async function getPokemonByName(request: FastifyRequest, reply: FastifyReply) {
-  
-  let name: string = request.params['name']
+export async function getPokemonByName(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  let name: string = request.params["name"];
 
-  reply.headers['Accept'] = 'application/json';
+  reply.headers["Accept"] = "application/json";
 
-  let params = {}
+  let params = {};
   let url = urlApiPokeman;
   name != null
-      ? name.trim() != ''
-      ? (params["name"] = name, url = url + '/', url = url + name)
-      : (url = url + '"?offset=20"', url = url + "&limit=20")
-      : (url = url + '"?offset=20"', url = url + "&limit=20")
+    ? name.trim() != ""
+      ? ((params["name"] = name), (url = url + "/"), (url = url + name))
+      : ((url = url + '"?offset=20"'), (url = url + "&limit=20"))
+    : ((url = url + '"?offset=20"'), (url = url + "&limit=20"));
 
   let response = await get(url);
   if (response == null) {
@@ -36,33 +38,33 @@ export async function getPokemonByName(request: FastifyRequest, reply: FastifyRe
 }
 
 /**
- * 
- * @param response 
+ *
+ * @param response
  * @returns PokemonWithStats
  */
-export const computeResponse = async (response: any): Promise<PokemonWithStats> => {
-
-  const types = response.types.map(type => type.type.url);
+export const computeResponse = async (
+  response: any
+): Promise<PokemonWithStats> => {
+  const types = response.types.map((type) => type.type.url);
   const pokemonTypes = [];
-  
+
   for await (let url of types) {
     const result = await get(url);
     pokemonTypes.push(result);
   }
-  if (pokemonTypes == undefined)
-    throw pokemonTypes
+  if (pokemonTypes == undefined) throw pokemonTypes;
 
-  const stats = response.stats.map(element => {
+  const stats = response.stats.map((element) => {
     const stats = [];
     let averageStat = 0;
-    pokemonTypes.map(pok =>
-        pok.stats?.map(st =>
-            st.stat.name.toUpperCase() == element.stat.name
-                ? stats.push(st.base_state)
-                : ([])
-        )
+    pokemonTypes.map((pok) =>
+      pok.stats?.map((st) =>
+        st.stat.name.toUpperCase() == element.stat.name
+          ? stats.push(st.base_state)
+          : []
+      )
     );
-    
+
     if (stats.length > 0) {
       averageStat = stats.reduce((a, b) => a + b, 0) / stats.length;
     } else {
@@ -70,11 +72,11 @@ export const computeResponse = async (response: any): Promise<PokemonWithStats> 
     }
     return {
       ...element,
-      averageStat
-    }
+      averageStat,
+    };
   });
   return {
     ...response,
-    stats
-  }
-}
+    stats,
+  };
+};
